@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DAY1 · 机械臂固件自检 · 2026-10-21</title>
+<style>
+:root{
+  --ink:#1f2937; --muted:#64748b; --paper:#fbfaf7; --card:#fff;
+  --accent:#0f766e; --accent-soft:#ccfbf1; --line:#e2e8f0;
+  --ok:#15803d; --ok-soft:#dcfce7; --bad:#b91c1c; --bad-soft:#fee2e2;
+  --warn:#a16207; --warn-soft:#fef9c3;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:920px;margin:0 auto;padding:44px 22px 90px}
+.eyebrow{color:var(--accent);font-weight:700;letter-spacing:.08em;text-transform:uppercase;font-size:12px}
+h1{font:700 clamp(28px,4.6vw,44px)/1.12 Georgia,serif;margin:10px 0 14px}
+h2{margin-top:42px;font-size:23px;border-top:1px solid var(--line);padding-top:26px}
+h3{margin:22px 0 10px;font-size:17px}
+.lede{color:var(--muted);font-size:18px;max-width:740px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin:16px 0;box-shadow:0 6px 20px rgba(15,23,42,.045)}
+.call{border-left:4px solid var(--accent);padding-left:16px}
+code{background:#f1f5f9;border-radius:4px;padding:1px 5px;font-size:14.5px}
+pre{overflow:auto;background:#172033;color:#e2e8f0;padding:16px;border-radius:10px;font-size:13.5px;line-height:1.5}
+a{color:var(--accent)}
+small,.hint{color:var(--muted)}
+.hint{font-size:14px;margin:6px 0 0}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th,td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+th{background:#f8fafc;font-weight:600}
+.bar-wrap{display:flex;align-items:center;gap:14px;margin:20px 0 4px;position:sticky;top:0;background:var(--paper);padding:10px 0;z-index:20;border-bottom:1px solid var(--line)}
+.bar{flex:1;height:10px;background:#e8edf3;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,#0f766e,#14b8a6);transition:width .25s}
+.bar-label{font-size:14px;color:var(--muted);white-space:nowrap}
+.bar-label b{color:var(--accent)}
+.learn{display:flex;gap:14px;align-items:flex-start}
+.learn input{margin-top:6px;width:18px;height:18px;accent-color:var(--accent);flex:none}
+.learn .meta{font-size:14px;color:var(--muted);margin-top:4px}
+.q{border-left:4px solid #cbd5e1}
+.q.done-ok{border-left-color:var(--ok)}
+.q.done-bad{border-left-color:var(--bad);background:#fffdfd}
+.qhead{display:flex;gap:12px;align-items:flex-start}
+.badge{flex:none;background:#e2e8f0;color:#334155;font-weight:700;font-size:13px;border-radius:7px;padding:2px 8px;margin-top:3px}
+.q.done-ok .badge{background:var(--ok-soft);color:var(--ok)}
+.q.done-bad .badge{background:var(--bad-soft);color:var(--bad)}
+.qhead p{margin:0}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+button{border:1px solid transparent;border-radius:8px;padding:9px 13px;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;font-size:14.5px;font-family:inherit}
+button:hover{filter:brightness(1.06)}
+button.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+button.ghost:hover{border-color:#94a3b8}
+button.pick[aria-pressed="true"]{background:var(--ok);}
+button.pick.bad[aria-pressed="true"]{background:var(--bad);}
+.answer{display:none;margin-top:14px;color:#115e59;background:var(--accent-soft);padding:14px 16px;border-radius:10px;font-size:15px}
+.answer.show{display:block}
+.answer code{background:#fff}
+.answer .ref{display:block;margin-top:10px;font-size:13.5px}
+.badtext{color:var(--bad);font-size:14px;margin-top:8px;display:none}
+.badtext.show{display:block}
+textarea,input[type=text],input[type=number],select{font:inherit;font-size:14.5px;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;background:#fff;color:var(--ink);width:100%}
+textarea{resize:vertical;min-height:52px}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:10px 0}
+label.f{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+.out{margin-top:12px;font-family:ui-monospace,Consolas,monospace;font-size:14px;background:#0f172a;color:#d1fae5;border-radius:10px;padding:14px;overflow:auto;white-space:pre-wrap;word-break:break-all;min-height:20px}
+.out.err{background:#450a0a;color:#fecaca}
+.byte-table td{text-align:center;font-family:ui-monospace,Consolas,monospace;padding:6px 4px;font-size:13px}
+.byte-table td.head{background:#f1f5f9;color:var(--muted);font-family:inherit;font-size:12px}
+.byte-table td.cmd{background:var(--accent-soft)}
+.byte-table td.sum{background:#fef9c3}
+.ok{color:var(--ok);font-weight:700}
+.bad{color:var(--bad);font-weight:700}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{background:#fff;color:var(--muted);border-color:var(--line);border-radius:8px 8px 0 0}
+.tabs button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pane{display:none}
+.pane.on{display:block}
+.board-item{display:grid;grid-template-columns:1fr;gap:8px;border-top:1px dashed var(--line);padding:14px 0}
+.board-item:first-child{border-top:0}
+.board-head{display:flex;gap:10px;align-items:center;font-weight:600}
+.board-head input{width:18px;height:18px;accent-color:var(--accent);flex:none}
+.board-item textarea{margin-top:2px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:11px 18px;border-radius:10px;font-size:14.5px;opacity:0;pointer-events:none;transition:.22s;z-index:99}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:14px 0}
+.summary div{background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center}
+.summary b{display:block;font-size:26px;color:var(--accent);line-height:1.2}
+.summary span{font-size:13px;color:var(--muted)}
+@media print{
+  body{background:#fff}
+  .bar-wrap,button,.toast{display:none!important}
+  .answer{display:block!important;background:#f0fdfa}
+  .card{box-shadow:none;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<main>
+
+<div class="eyebrow">Day 1 · Robotic Arm · 2026-10-21</div>
+<h1>第一天：把一条链讲通</h1>
+<p class="lede">前几天在规划，今天开始吃代码。这一页不是课件，是<strong>考卷 + 记录表</strong>：先答、再自评、最后对答案，最后把记录贴回对话。</p>
+
+<div class="card call">
+  <strong>怎么用：</strong>A 组每题必须先在「答出来了 / 卡住了」里选一个，答案才会展开——防手滑刷分。
+  所有勾选、输入、自评都存本地，刷新不丢。<strong>合上源码再答题</strong>，卡住就诚实点「卡住了」，那才是今天要补的地方。
+</div>
+
+<div class="bar-wrap">
+  <div class="bar"><i id="barFill"></i></div>
+  <div class="bar-label">进度 <span id="barText">0%</span> · A 组 <b id="score">0/15</b></div>
+</div>
+
+<h2>0. 今天的基线</h2>
+<div class="card">
+  <table>
+    <tr><th>项</th><th>实测</th><th>说明</th></tr>
+    <tr><td>构建</td><td><code>ninja: no work to do</code></td><td>源码与 <code>Test3.elf</code>（10-19 20:54）一致</td></tr>
+    <tr><td>FLASH</td><td><b>35944 B / 64 KB ≈ 54.8%</b></td><td>text 35852 + data 92</td></tr>
+    <tr><td>RAM</td><td><b>3736 B / 20 KB ≈ 18.2%</b></td><td>data 92 + bss 3644</td></tr>
+    <tr><td>文档漂移</td><td>0.1 写 35168 B / 53.66%</td><td>RAM 对得上，FLASH 少算 776 B，今天改掉</td></tr>
+  </table>
+  <p class="hint">先 <code>git add -A &amp;&amp; git commit</code> 一个基线，再做 B 组实验。当前大量文件已 add 未 commit。</p>
+</div>
+
+<h2>1. 四块学习清单</h2>
+<p class="hint">勾满这四块，再去看 A 组。每块都按「必须理解 / 只需接口 / 暂时不深挖」三分法，别平均用力。</p>
+<div id="learn"></div>
+
+<h2>2. A 组 · 15 题闭卷（30 min）</h2>
+<p class="hint">合上代码。答完一题选一个状态，答案才展开。选「卡住了」不计分，但计入进度——诚实比分数重要。</p>
+<div id="quiz"></div>
+
+<h2>3. 手算核对器</h2>
+<p class="hint">把 <code>tools/frame_tool.py</code> 的逻辑搬到了浏览器：手算完贴进来对，比翻答案快，也比翻答案诚实。</p>
+<div class="card">
+  <div class="tabs">
+    <button data-pane="gen" class="on">生成帧</button>
+    <button data-pane="parse">解析帧</button>
+  </div>
+
+  <div class="pane on" id="pane-gen">
+    <div class="row">
+      <div><label class="f">类型</label>
+        <select id="gType">
+          <option value="move">MOVE 0x01</option>
+          <option value="joint">SET_JOINT 0x05</option>
+          <option value="home">HOME 0x02</option>
+          <option value="stop">STOP 0x03</option>
+          <option value="query">QUERY 0x04</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" id="gMoveRow">
+      <div><label class="f">x (mm)</label><input id="gx" type="number" value="-59"></div>
+      <div><label class="f">y (mm)</label><input id="gy" type="number" value="143"></div>
+      <div><label class="f">z (mm)</label><input id="gz" type="number" value="32"></div>
+      <div><label class="f">phi (°)</label><input id="gp" type="number" value="45"></div>
+    </div>
+    <div class="row" id="gJointRow" style="display:none">
+      <div><label class="f">关节</label>
+        <select id="gj">
+          <option value="0">0 BASE</option>
+          <option value="1">1 UPPER</option>
+          <option value="2">2 FOREARM</option>
+          <option value="3">3 END</option>
+        </select>
+      </div>
+      <div><label class="f">角度 (°)</label><input id="gd" type="number" value="180"></div>
+    </div>
+    <div class="btns"><button id="gGo">生成</button><button class="ghost" id="gHome">填 home 位姿</button></div>
+    <div id="gOut"></div>
+  </div>
+
+  <div class="pane" id="pane-parse">
+    <label class="f">HEX（支持空格 / 逗号 / 0x / 连续串）</label>
+    <textarea id="pIn" placeholder="AA 0C 81 65 04 C2 01 7C FC 84 03 62"></textarea>
+    <div class="btns"><button id="pGo">解析</button><button class="ghost" id="pDemo">填示例</button></div>
+    <div id="pOut"></div>
+  </div>
+</div>
+
+<h2>4. B 组 · 5 个改代码实验</h2>
+<p class="hint">每题先写下你的预测，再点「提交预测」看答案。没写预测就点，等于没做。</p>
+<div id="exps"></div>
+
+<h2>5. C 组 · 6 项上板验收</h2>
+<p class="hint">前置：舵机独立 5V 大电流 + 共地；驱动板两排排针<strong>跳线帽短接</strong>（上次“舵机不转”的坑）。</p>
+<div class="card" id="board"></div>
+
+<h2>6. 收尾</h2>
+<div class="card">
+  <div class="summary">
+    <div><b id="sLearn">0/4</b><span>学习块</span></div>
+    <div><b id="sA">0/15</b><span>A 组答出</span></div>
+    <div><b id="sB">0/5</b><span>B 组提交</span></div>
+    <div><b id="sC">0/6</b><span>C 组验收</span></div>
+  </div>
+  <h3>今天没搞懂的 3 个问题（明天第一件事）</h3>
+  <textarea id="q0" placeholder="1. ..."></textarea>
+  <div style="height:8px"></div>
+  <textarea id="q1" placeholder="2. ..."></textarea>
+  <div style="height:8px"></div>
+  <textarea id="q2" placeholder="3. ..."></textarea>
+  <div class="btns">
+    <button id="copyBtn">复制今日记录</button>
+    <button class="ghost" id="resetBtn">清空重来</button>
+  </div>
+  <p class="hint">「复制今日记录」会整理成 markdown，直接贴回对话，我接着讲没答上的题。</p>
+</div>
+
+<p><small>答案里的行号对应 <code>Robotic_Arm_Main\1</code>；源码链接用 <code>file:///</code>，在浏览器里点开会显示纯文本，行号请按文本里的标号找。本页无外部依赖，双击即可离线打开。</small></p>
+
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+var SRC = 'file:///D:/Robot_Control/Robo1/Project/Robot_Arm/Robot_Arm/Robotic_Arm_Main/1/';
+var KEY = 'arm-day1-2026-10-21';
+
+/* ---------- 数据 ---------- */
+
+var LEARN = [
+  {t:'块 1 · 主循环与节拍（45 min）',
+   f:'app.c：只读 App_Init / App_Run / apply_servo / watchdog_task',
+   must:'10 步初始化顺序；4 个软任务周期 10/20/50/50；“脉宽变了才写 CCR”',
+   skip:'CubeMX 生成的 MX_*_Init',
+   check:'不看代码写出 App_Run 伪代码，并指出哪一行可能卡住后面的任务'},
+  {t:'块 2 · 一条 MOVE 的链路（50 min，最重要）',
+   f:'proto.c → cmd.c → motion.c → joint.c → servo_drv.c，只盯 SET_POSE 一条分支',
+   must:'Proto_Poll 的 while(≥4)；Cmd_Task 的 SET_POSE；start/current/target 三个数组；三次夹紧；上电 home 的两条路径',
+   skip:'acosf / atan2f 推导、oled.c 内部',
+   check:'拿一帧 12 字节，手算到四个 CCR（home 应为 1500/500/500/1500）'},
+  {t:'块 3 · 状态归属与并发（45 min）',
+   f:'motion.c 的 static、ringbuf.c 全读（85 行）、uart_drv.c',
+   must:'谁能改 current；readIndex/writeIndex 的 SPSC 与 volatile；中断里到底执行了哪几行；Sched_IsDue 为什么不补跑',
+   skip:'去抖状态机的每个分支',
+   check:'画“变量 → 谁写 → 谁读 → 上下文”表'},
+  {t:'块 4 · 安全链（30 min）',
+   f:'把块 2/3 的文件按“出错时谁兜底”串一遍',
+   must:'三道夹紧；急停 target=current 不跳变；看门狗运动中不超时',
+   skip:'—',
+   check:'说出“上位机运动到一半拔线，接下来 3 秒发生什么”'}
+];
+
+var QUESTS = [
+  {q:'`App_Run` 一帧里四个软任务的周期分别是多少？哪个任务最可能推迟其他任务？',
+   a:'**10 / 20 / 50 / 50 ms**（按键 / 运动 / 看门狗 / OLED）。三个潜在阻塞点：① 页面切换时的 `OLED_Update`（软件 I2C 发 1024 字节，ms 级，具体待实测）；② `Uart_Send` → `HAL_UART_Transmit`（12 字节约 1 ms，超时上限 100 ms）；③ `Proto_Poll` 的 while 处理积压帧。它们只推迟同一轮后面的任务；运动按步数推进，所以表现为“变慢”，不是“丢步”。',
+   ref:'app.c:279-325'},
+  {q:'一个 12 字节 MOVE 帧，从进 USART2 到 CCR 改变，按顺序写出函数名，并标出哪一步在中断里。',
+   a:'中断里只有：`HAL_UARTEx_RxEventCallback` → `RingBuf_Write`（+ 重挂接收）。主循环：`App_Run` → `Proto_Poll`（`RingBuf_Peek` / `frame_sum` / `Cmd_Submit` / `RingBuf_Skip`）→ `Cmd_Task` → `Kinematics_InWorkspace` → `IK_Solve` → `Motion_MoveTo`；20 ms 后 `Motion_Task` → `apply_servo` → `Motion_GetCurrent` → `Joint_ThetaToUs` → `Servo_SetPulse` → `__HAL_TIM_SET_COMPARE`。',
+   ref:'uart_drv.c:46-59 / app.c:279-313'},
+  {q:'ACK 里的四个角度是“目标角”还是“当前实际角”？为什么？会让上位机误判什么？',
+   a:'目标角。`Cmd_Task` 成功时 `r->theta = out`（MOVE 是 IK 解，HOME 是 home，QUERY 是当前 `cur`），`app.c` 拿到结果立即发 ACK，此时 `Motion` 一步都还没走。所以 ACK 只能当“命令已接受”；把它当“已到位”会让上位机在运动中途下发下一条命令。',
+   ref:'cmd.c:295-307 / app.c:284-295'},
+  {q:'`RingBuf_Write` 在缓冲满时返回什么？调用者怎么处理？对协议帧的后果是什么？',
+   a:'返回 0，整批不写。`RxEventCallback` 忽略返回值 → 这批数据永久丢失。丢在帧中间会让后续字节错位，`Proto_Poll` 靠找 `0xAA` + 校验和滑动重同步。设计取“丢新不覆盖旧”，避免破坏已缓存的完整帧。',
+   ref:'ringbuf.c:49-73 / uart_drv.c:53-57'},
+  {q:'校验失败的帧，为什么 `RingBuf_Skip(1)` 而不是 `Skip(len)`？什么情况会连续回多个 `0x82/0x02`？',
+   a:'校验失败往往说明“这个 `0xAA` 不是真帧头”（噪声或错位），丢 1 字节滑动重找；丢整帧可能跳过真正的帧头。若流里连续出现多个“`0xAA` + 合法 LEN”的假帧头，每个都会失败一次、各回一个 ERR，而每次 `Uart_Send` 都是阻塞的。',
+   ref:'proto.c:116-121'},
+  {q:'写出 4 个逻辑关节 → 物理通道 → 引脚 → 实际舵机的对应关系。哪个文档和代码在这里不一致？',
+   a:'BASE→CH4→PA11；UPPER→CH3→PA10；FOREARM→CH2→PA9；END→CH1→PA8。`ARM_HANDOFF.md` 第 3 节把 CH1 标成 `GRIP/抓夹`，正式设计是**无抓夹、第 4 关节 = 末端 pitch**，代码里叫 `END`。这是测试台与正式工程的差异，不是 bug。',
+   ref:'robot_params.h:67-74 / joint.c:17-47'},
+  {q:'运动中按 KEY4 急停，四个 CCR 会不会跳变？为什么？下一次 MOVE 的起点是什么？',
+   a:'不会跳变。`Motion_Stop` 把 `target` 设成 `current`，`current` 本身没动；`apply_servo` 算出的 us 与上次相同，`Servo_GetPulse != us` 不成立 → 不写 CCR。下一次 `Motion_MoveTo` 的 `start` 取当前 `current`，无缝续接。',
+   ref:'motion.c:83-89 / app.c:102-119'},
+  {q:'底座限位 22.5°~202.5°，IK 里 `θ1` 归一化到 `[0,2π)`。举两个“算得出角度但一定不可达”的目标区域。',
+   a:'① 第四象限 `x>0, y<0`：θ1 ∈ (202.5°, 360°)，全部越限；② 第三象限 `x<0, y<0` 且 θ1 > 202.5°。结论：`y<0` 且 `x>0` 的目标必被拒。',
+   ref:'kinematics.c:156-163'},
+  {q:'`Motion_Task` 为什么按“步数”推进而不是用 `HAL_GetTick` 算时间？主循环变慢时，运动时长会怎样？',
+   a:'为了纯逻辑、不依赖 HAL，能在 PC 上单测。每步固定 20 ms，但实际步进由 `Sched_IsDue` 驱动；主循环被阻塞时步间隔变长，**总步数不变 → 总时长变长**。300–2000 ms 是“理想节拍下”的承诺。',
+   ref:'motion.c:8-11 / motion.c:96-126'},
+  {q:'通信看门狗为什么在运动过程中不触发？上位机在运动中途死掉，实际会发生什么？',
+   a:'`watchdog_task` 里 `if (Motion_IsBusy()) s_last_activity = now_ms;` 持续续命。中途死掉：当前运动照常走完（≤2 s），结束后 500 ms 无新帧 → `Cmd_StopNow()`，屏幕 `TO`，`s_timeout_latched=1` 防重复急停。',
+   ref:'app.c:202-231'},
+  {q:'`app.c` 把 `s_mode` 塞进 `UiState.mode`，`ui.c` 拿它和 `UI_PAGE_HOST` 比。两个常量在哪、值多少？把 `APP_MODE_HOST` 改成 2 会怎样？',
+   a:'`APP_MODE_MENU/HOST` 在 `app.c`（0/1），`UI_PAGE_MENU/HOST` 在 `ui.c`（0/1），数值巧合同值。若 `APP_MODE_HOST` 改成 2，`page = (s_state.mode === UI_PAGE_HOST)` 永远为假 → HOST 页永不显示，且不报错。隐式耦合，应在 `app.c` 里显式映射。',
+   ref:'app.c:47-48 / ui.c:19-20 / ui.c:299'},
+  {q:'`Servo_Init` 为什么必须“先写 CCR 再 Start PWM”？不这么做，上电瞬间会看到什么？',
+   a:'否则 `PWM_Start` 后第一个周期 CCR=0，输出无效脉宽，舵机从上电位置猛跳到某个极限再回 home。先写 CCR 保证第一个脉冲就是 home。',
+   ref:'servo_drv.c:53-71'},
+  {q:'连续发两条 MOVE（不是 STOP），第二条会等第一条运动完吗？实际哪条生效？',
+   a:'不会等。`Proto_Poll` 一次 while 把缓冲里所有完整帧都入队；`Cmd_Task` 每个主循环取一条，几个循环内全部执行，远小于 20 ms。第二条执行时 `current` 还没动，于是它覆盖 `target`，`start` 取当前 `current`。**几乎只有最后一条生效**。命令队列 ≠ 运动队列。',
+   ref:'proto.c:80-209 / cmd.c:190-245'},
+  {q:'`robot_params.h` 里的 `RINGBUF_SIZE` 被谁用了？改它会影响环形缓冲吗？这说明什么？',
+   a:'没人用。`ringbuf.c` 自己 `#define RINGBUF_SIZE 128`，且没 include `robot_params.h`。改配置层不影响环形缓冲——“唯一参数入口”在这里被打破。修法：`ringbuf.c` include `robot_params.h`，删本地宏。',
+   ref:'robot_params.h:96 / ringbuf.c:18'},
+  {q:'上电时“实际输出的 home 脉宽”和“`Motion` 认为的 home 角度”是两条独立路径。分别是哪两条？何时不一致？不一致时 20 ms 内看到什么？',
+   a:'① `Servo_Init` 直接把 `SERVO_CH*_HOME_US` 写进 CCR；② `Joint_Init` 用 `Joint_UsToTheta(home_us)` 反算 `s_home`，`Motion_Init` 拿它当 `current`，第一次 `apply_servo` 再转回 us。两条只在“`joint_cfg[].home_us` 与 `SERVO_CH*_HOME_US` 同源、且标定公式自洽”时吻合。不一致（如只改 `dir`）→ 上电先到 home，20 ms 后跳一下。B1 是最小复现。',
+   ref:'servo_drv.c:57-71 / joint.c:70-79 / app.c:102-119'}
+];
+
+var EXPS = [
+  {t:'B1 · 把 `J_BASE_DIR` 由 −1 改成 +1',
+   q:'先算：`Joint_UsToTheta(1500)` 得多少度？第一次 `apply_servo` 会写多少 us？为什么上电 20 ms 内会跳一下？',
+   a:'`Joint_UsToTheta` 只夹 us、不夹角度：202.5 + 1×(1500−500)/11.111 = **292.5°**。第一次 `apply_servo` 的 `ThetaToUs` 会夹到软限位 202.5° → **500 us**。所以 `Servo_Init` 先写 1500，20 ms 后写 500，底座跳 1000 us。根因：`Servo_Init` 的 home 走 `home_us` 直写，`Motion` 的 home 走 `UsToTheta` 反算，两条路径只在标定自洽时吻合。'},
+  {t:'B2 · 去掉 `apply_servo` 里的 `if (Servo_GetPulse(ch) != us)`',
+   q:'先算：CCR 写入频率变成多少？对 PWM 波形有影响吗？',
+   a:'每 20 ms 无条件写 4 次 CCR。PWM 波形原则上不变，但写 CCR 时若计数器已越过该值，个别周期脉宽会异常；“变了才写”把这种窗口从“每 20 ms 4 次”降到“只在真正变化时”。`Servo_GetPulse` 随之失去意义。'},
+  {t:'B3 · `MOTION_STEP_MS` 由 20 改成 10',
+   q:'先算：800 ms 复位还是 800 ms 吗？步数变多少？`cmd.c` 要跟着改吗？',
+   a:'步数翻倍（800 ms → 80 步），每步间隔按新值 10 ms 调度，**总时长不变**；`dur < MOTION_STEP_MS` 的“立即到位”阈值也跟着变成 10 ms。`cmd.c` 的 `calc_duration` 用的是 ms，不受影响。'},
+  {t:'B4 · 发 `SET_JOINT(UPPER=180)`（帧 `AA 07 05 01 08 07 C6`）',
+   q:'先判断：回 ACK 还是 ERR？ACK 里 UPPER 是多少？',
+   a:'回 ACK，不报错。`Joint_Clamp` 把 180 夹到 `J_UPPER_THETA_MAX = 45`，ACK 里 UPPER = 45.0（`C2 01`）。这是 `cmd.c` 注释里的 F10 约定：越界值夹紧、不报错。'},
+  {t:'B5 · 发 MOVE 到 home 位姿（−59,143,32,45）',
+   q:'先判断：会运动吗？运动多久？ACK 为什么不会等它？',
+   a:'ACK 立即返回（命令被接受时就发，不等到位）。是否运动取决于 IK 解与当前角之差：目标就是 `FK(home)` 取整，解接近 home，`max_delta < 0.05` 时 `calc_duration` 返回 0 → 立即到位、不运动；否则约 300 ms 微调。'}
+];
+
+var BOARD = [
+  {id:'C1', op:'上电', exp:'底座 112.5°、大臂 +45°、小臂 −90°、末端 +90°；无猛动',
+   hint:'Servo_CH*_HOME_US、joint_cfg[].home_us、供电压降'},
+  {id:'C2', op:'四键：KEY2 短按 / 长按 1 s / KEY3 / KEY4',
+   exp:'进 HOST 页 / 退出并急停 / 回 home / 屏显 STOP',
+   hint:'KeyDrv_Read 低有效、去抖 20 ms、Button_Held'},
+  {id:'C3', op:'HOST 下发 QUERY：`AA 04 04 B2`',
+   exp:'回 `AA 0C 81 65 04 C2 01 7C FC 84 03 62`',
+   hint:'115200、PA2/PA3、RxToIdle 是否挂上'},
+  {id:'C4', op:'下发 BASE=180°：`AA 07 05 00 08 07 C5`',
+   exp:'底座对准 −x 轴；ACK 里 BASE ≈ 180.0',
+   hint:'底座标定公式、750 us ↔ −x 的实测'},
+  {id:'C5', op:'下发 MOVE home：`AA 0C 01 C5 FF 8F 00 20 00 C2 01 ED`',
+   exp:'基本不动或极小修正；ACK ≈ home',
+   hint:'IK 选解、calc_duration 是否返回 0'},
+  {id:'C6', op:'进入 HOST 后不发任何帧',
+   exp:'约 500 ms 后屏幕 TO，舵机停',
+   hint:'UART_TIMEOUT_MS、watchdog_task 是否在跑'}
+];
+
+/* ---------- 状态 ---------- */
+
+var S = {
+  learn:[false,false,false,false],
+  a:[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  b:['','','','',''],
+  bDone:[false,false,false,false,false],
+  c:[false,false,false,false,false,false],
+  cNote:['','','','','',''],
+  q:['','','']
+};
+
+function load(){
+  try{
+    var raw = localStorage.getItem(KEY);
+    if(!raw) return;
+    var o = JSON.parse(raw);
+    if(o.learn && o.learn.length===4) S.learn = o.learn;
+    if(o.a && o.a.length===15) S.a = o.a;
+    if(o.b && o.b.length===5) S.b = o.b;
+    if(o.bDone && o.bDone.length===5) S.bDone = o.bDone;
+    if(o.c && o.c.length===6) S.c = o.c;
+    if(o.cNote && o.cNote.length===6) S.cNote = o.cNote;
+    if(o.q && o.q.length===3) S.q = o.q;
+  }catch(e){}
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){}
+}
+
+/* ---------- 小工具 ---------- */
+
+function esc(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function md(s){
+  return esc(s).replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>');
+}
+function el(tag, cls, html){
+  var d = document.createElement(tag);
+  if(cls) d.className = cls;
+  if(html != null) d.innerHTML = html;
+  return d;
+}
+function toast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ t.classList.remove('show'); }, 1600);
+}
+
+/* ---------- 渲染：学习清单 ---------- */
+
+function renderLearn(){
+  var box = document.getElementById('learn');
+  box.innerHTML = '';
+  LEARN.forEach(function(item, i){
+    var card = el('div','card');
+    var row = el('div','learn');
+    var chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.checked = S.learn[i]; chk.setAttribute('aria-label','完成 '+item.t);
+    chk.addEventListener('change', function(){ S.learn[i] = chk.checked; save(); updateStats(); });
+    var body = el('div');
+    body.appendChild(el('div','', '<strong>'+esc(item.t)+'</strong>'));
+    body.appendChild(el('div','meta', '<b>读：</b>'+md(item.f)));
+    body.appendChild(el('div','meta', '<b>必须理解：</b>'+md(item.must)));
+    body.appendChild(el('div','meta', '<b>只需接口：</b>'+md(item.skip)));
+    body.appendChild(el('div','meta', '<b>验收：</b>'+md(item.check)));
+    row.appendChild(chk); row.appendChild(body);
+    card.appendChild(row);
+    box.appendChild(card);
+  });
+}
+
+/* ---------- 渲染：A 组 ---------- */
+
+function renderQuiz(){
+  var box = document.getElementById('quiz');
+  box.innerHTML = '';
+  QUESTS.forEach(function(item, i){
+    var card = el('div','card q');
+    card.id = 'q'+i;
+    var head = el('div','qhead');
+    head.appendChild(el('span','badge','Q'+(i+1)));
+    head.appendChild(el('p','', md(item.q)));
+    card.appendChild(head);
+
+    var btns = el('div','btns');
+    var ok = el('button','pick','答出来了');
+    ok.dataset.i = i; ok.dataset.v = '1';
+    var bad = el('button','pick bad','卡住了');
+    bad.dataset.i = i; bad.dataset.v = '2';
+    var see = el('button','ghost toggle','看答案');
+    see.dataset.i = i;
+    btns.appendChild(ok); btns.appendChild(bad); btns.appendChild(see);
+    card.appendChild(btns);
+
+    card.appendChild(el('div','badtext','先选一个状态再对答案（没选不算分）。'));
+
+    var ans = el('div','answer');
+    ans.id = 'ans'+i;
+    ans.innerHTML = md(item.a) + '<span class="ref">对照源码：<a href="'+SRC+'">'+esc(item.ref)+'</a></span>';
+    card.appendChild(ans);
+
+    box.appendChild(card);
+  });
+}
+
+function paintA(i){
+  var card = document.getElementById('q'+i);
+  var v = S.a[i];
+  card.classList.remove('done-ok','done-bad');
+  if(v===1) card.classList.add('done-ok');
+  if(v===2) card.classList.add('done-bad');
+  var picks = card.querySelectorAll('button.pick');
+  picks[0].setAttribute('aria-pressed', v===1 ? 'true':'false');
+  picks[1].setAttribute('aria-pressed', v===2 ? 'true':'false');
+}
+
+function pickA(i, v){
+  S.a[i] = v; save(); paintA(i); updateStats();
+}
+
+function toggleAns(i){
+  var card = document.getElementById('q'+i);
+  var ans = document.getElementById('ans'+i);
+  var hint = card.querySelector('.badtext');
+  if(S.a[i]===0){
+    hint.classList.add('show');
+    setTimeout(function(){ hint.classList.remove('show'); }, 2200);
+    return;
+  }
+  ans.classList.toggle('show');
+}
+
+/* ---------- 渲染：B 组 ---------- */
+
+function renderExps(){
+  var box = document.getElementById('exps');
+  box.innerHTML = '';
+  EXPS.forEach(function(item, i){
+    var card = el('div','card');
+    card.appendChild(el('div','', '<strong>'+md(item.t)+'</strong>'));
+    card.appendChild(el('p','', md(item.q)));
+    var ta = document.createElement('textarea');
+    ta.placeholder = '写下你的预测，再点提交…';
+    ta.value = S.b[i];
+    ta.addEventListener('input', function(){ S.b[i] = ta.value; save(); });
+    card.appendChild(ta);
+
+    var btns = el('div','btns');
+    var sub = el('button','','提交预测');
+    var ans = el('div','answer');
+    ans.innerHTML = md(item.a);
+    if(S.bDone[i]) ans.classList.add('show');
+    sub.addEventListener('click', function(){
+      if(!S.b[i].trim()){ toast('先写预测，再提交'); ta.focus(); return; }
+      S.bDone[i] = true; save(); ans.classList.add('show'); updateStats();
+    });
+    btns.appendChild(sub);
+    card.appendChild(btns);
+    card.appendChild(ans);
+    box.appendChild(card);
+  });
+}
+
+/* ---------- 渲染：C 组 ---------- */
+
+function renderBoard(){
+  var box = document.getElementById('board');
+  box.innerHTML = '';
+  BOARD.forEach(function(item, i){
+    var wrap = el('div','board-item');
+    var head = el('div','board-head');
+    var cb = document.createElement('input');
+    cb.type = 'checkbox'; cb.checked = S.c[i];
+    cb.addEventListener('change', function(){ S.c[i] = cb.checked; save(); updateStats(); });
+    head.appendChild(cb);
+    head.appendChild(el('span','', esc(item.id)+' · '+md(item.op)));
+    wrap.appendChild(head);
+    wrap.appendChild(el('div','hint', '<b>期望：</b>'+md(item.exp)+' &nbsp;|&nbsp; <b>不对先查：</b>'+md(item.hint)));
+    var ta = document.createElement('textarea');
+    ta.placeholder = '实测 / 差异记录…';
+    ta.value = S.cNote[i];
+    ta.addEventListener('input', function(){ S.cNote[i] = ta.value; save(); });
+    wrap.appendChild(ta);
+    box.appendChild(wrap);
+  });
+}
+
+/* ---------- 统计 ---------- */
+
+function counts(){
+  var learn = S.learn.filter(Boolean).length;
+  var answered = S.a.filter(function(v){ return v>0; }).length;
+  var score = S.a.filter(function(v){ return v===1; }).length;
+  var bDone = S.bDone.filter(Boolean).length;
+  var cDone = S.c.filter(Boolean).length;
+  return {learn:learn, answered:answered, score:score, bDone:bDone, cDone:cDone};
+}
+
+function updateStats(){
+  var c = counts();
+  var pct = Math.round(20*c.learn/4 + 45*c.answered/15 + 15*c.bDone/5 + 20*c.cDone/6);
+  document.getElementById('barFill').style.width = pct+'%';
+  document.getElementById('barText').textContent = pct+'%';
+  document.getElementById('score').textContent = c.score+'/15';
+  document.getElementById('sLearn').textContent = c.learn+'/4';
+  document.getElementById('sA').textContent = c.score+'/15';
+  document.getElementById('sB').textContent = c.bDone+'/5';
+  document.getElementById('sC').textContent = c.cDone+'/6';
+}
+
+/* ---------- 帧工具 ---------- */
+
+function sum8(arr){ var s=0; for(var i=0;i<arr.length;i++) s+=arr[i]; return s&0xFF; }
+
+function u16(v){ v = (v|0) & 0xFFFF; return [v & 0xFF, (v>>8) & 0xFF]; }
+
+function buildFrame(cmd, payload){
+  var body = [0xAA, 4+payload.length, cmd].concat(payload);
+  return {bytes: body.concat([sum8(body)]), body: body};
+}
+
+function frameFor(kind, x, y, z, phi, joint, deg){
+  if(kind==='move'){
+    return buildFrame(0x01, u16(x).concat(u16(y), u16(z), u16(Math.round(phi*10))));
+  }
+  if(kind==='joint'){
+    return buildFrame(0x05, [joint & 0xFF].concat(u16(Math.round(deg*10))));
+  }
+  if(kind==='home')  return buildFrame(0x02, []);
+  if(kind==='stop')  return buildFrame(0x03, []);
+  if(kind==='query') return buildFrame(0x04, []);
+  throw new Error('unknown kind '+kind);
+}
+
+function hexs(b){
+  var out = [];
+  for(var i=0;i<b.length;i++){ var h=b[i].toString(16).toUpperCase(); out.push(h.length<2?'0'+h:h); }
+  return out.join(' ');
+}
+
+function parseHex(str){
+  var s = String(str).replace(/0x/gi,' ').replace(/[,;:]/g,' ').trim();
+  if(!s) return [];
+  var toks = s.split(/\s+/), out = [];
+  for(var i=0;i<toks.length;i++){
+    var t = toks[i];
+    if(!/^[0-9a-fA-F]+$/.test(t)) throw new Error('不是十六进制：'+t);
+    if(t.length <= 2){ out.push(parseInt(t,16)); }
+    else if(t.length % 2 === 0){
+      for(var k=0;k<t.length;k+=2) out.push(parseInt(t.substr(k,2),16));
+    }
+    else throw new Error('长度不对：'+t);
+  }
+  return out;
+}
+
+var CMD_NAME = {0x01:'MOVE',0x02:'HOME',0x03:'STOP',0x04:'QUERY',0x05:'SET_JOINT',0x81:'ACK',0x82:'ERR'};
+var ERR_NAME = {0:'NONE',1:'工作空间 / IK 不可达',2:'校验和错误',3:'参数非法',4:'未知命令'};
+var JNAME = ['BASE','UPPER','FOREARM','END'];
+
+function s16(lo,hi){
+  var v = (lo | (hi<<8)) & 0xFFFF;
+  return v > 32767 ? v - 65536 : v;
+}
+
+function parseStream(b){
+  var out = [], i = 0;
+  while(i < b.length){
+    if(b[i] !== 0xAA){ i++; continue; }
+    if(i+2 > b.length) break;
+    var len = b[i+1];
+    if(len < 4 || len > 16){ i++; continue; }
+    if(i+len > b.length) break;
+    var f = b.slice(i, i+len);
+    var calc = sum8(f.slice(0, len-1));
+    var item = {off:i, raw:f, len:len, cmd:f[2], ok:(calc === f[len-1]), calc:calc, recv:f[len-1]};
+    var c = f[2];
+    if(c===0x81 && len===12){
+      var t = [];
+      for(var k=0;k<4;k++) t.push(s16(f[3+2*k], f[4+2*k]) / 10);
+      item.theta = t;
+    } else if(c===0x82 && len===5){
+      item.err = f[3];
+    } else if(c===0x01 && len===12){
+      item.pose = {x:s16(f[3],f[4]), y:s16(f[5],f[6]), z:s16(f[7],f[8]), phi:s16(f[9],f[10])/10};
+    } else if(c===0x05 && len===7){
+      item.joint = {j:f[3], deg:s16(f[4],f[5])/10};
+    }
+    out.push(item);
+    i += len;
+  }
+  return out;
+}
+
+/* ---------- 帧工具 DOM ---------- */
+
+function renderGen(){
+  var kind = document.getElementById('gType').value;
+  document.getElementById('gMoveRow').style.display  = (kind==='move') ? '' : 'none';
+  document.getElementById('gJointRow').style.display = (kind==='joint') ? '' : 'none';
+}
+
+function doGen(){
+  var kind = document.getElementById('gType').value;
+  var x = +document.getElementById('gx').value;
+  var y = +document.getElementById('gy').value;
+  var z = +document.getElementById('gz').value;
+  var phi = +document.getElementById('gp').value;
+  var joint = +document.getElementById('gj').value;
+  var deg = +document.getElementById('gd').value;
+  var out = document.getElementById('gOut');
+  out.className = 'out';
+  try{
+    var fr = frameFor(kind, x, y, z, phi, joint, deg);
+    var b = fr.bytes;
+    var names = ['AA','LEN','CMD'];
+    for(var i=3;i<b.length-1;i++) names.push('b'+i);
+    names.push('SUM');
+
+    var head = '', hex = '', dec = '', esc2 = '';
+    for(var k=0;k<b.length;k++){
+      var cls = (k===b.length-1) ? 'sum' : (k===2 ? 'cmd' : '');
+      head += '<td class="head">'+names[k]+'</td>';
+      hex  += '<td class="'+cls+'">'+hexs([b[k]])+'</td>';
+      dec  += '<td class="'+cls+'">'+b[k]+'</td>';
+    }
+    var expr = b.slice(0, b.length-1).join('+') + ' = ' + sum8(b.slice(0, b.length-1)) +
+               '（即 0x' + hexs([b[b.length-1]]) + '）';
+
+    var cmdName = CMD_NAME[b[2]] || ('0x'+b[2].toString(16));
+    out.innerHTML =
+      '<div style="font-size:20px;letter-spacing:.06em;margin-bottom:12px">'+hexs(b)+'</div>' +
+      '<table class="byte-table"><tr>'+head+'</tr><tr>'+hex+'</tr><tr>'+dec+'</tr></table>' +
+      '<div style="margin-top:12px;color:#94a3b8">命令 '+cmdName+' · 帧长 '+b.length+'</div>' +
+      '<div style="margin-top:6px;color:#fde68a">SUM 验算：'+expr+'</div>';
+  }catch(e){
+    out.className = 'out err';
+    out.textContent = e.message;
+  }
+}
+
+function doParse(){
+  var out = document.getElementById('pOut');
+  out.className = 'out';
+  try{
+    var bytes = parseHex(document.getElementById('pIn').value);
+    if(!bytes.length){ out.textContent = '没有输入字节。'; return; }
+    var frames = parseStream(bytes);
+    if(!frames.length){ out.textContent = '共 ' + bytes.length + ' 字节，没找到合法帧（需要 0xAA + LEN 4..16）。'; return; }
+    var html = '<div style="color:#94a3b8;margin-bottom:10px">共 '+bytes.length+' 字节，解析到 '+frames.length+' 帧</div>';
+    frames.forEach(function(f){
+      var name = CMD_NAME[f.cmd] || ('0x'+f.cmd.toString(16));
+      var sumTxt = f.ok ? '<span class="ok">SUM OK</span>'
+                        : '<span class="bad">SUM BAD（算得 '+f.calc+'，收到 '+f.recv+'）</span>';
+      html += '<div style="margin:12px 0;padding-top:10px;border-top:1px solid #334155">' +
+              '<div><b>'+name+'</b> @'+f.off+' · LEN='+f.len+' · '+sumTxt+'</div>';
+      if(f.theta) html += '<div>theta(BASE/UPPER/FOREARM/END) = '+f.theta.map(function(v){return v.toFixed(1);}).join(' / ')+'</div>';
+      if(f.pose)  html += '<div>pose = x='+f.pose.x+' y='+f.pose.y+' z='+f.pose.z+' phi='+f.pose.phi.toFixed(1)+'</div>';
+      if(f.err != null) html += '<div>err = 0x'+f.err.toString(16)+' ('+(ERR_NAME[f.err]||'?')+')</div>';
+      if(f.joint) html += '<div>joint = '+f.joint.j+' ('+(JNAME[f.joint.j]||'?')+') deg='+f.joint.deg.toFixed(1)+'</div>';
+      html += '<div style="color:#94a3b8">'+hexs(f.raw)+'</div></div>';
+    });
+    out.innerHTML = html;
+  }catch(e){
+    out.className = 'out err';
+    out.textContent = e.message;
+  }
+}
+
+/* ---------- 导出 ---------- */
+
+function buildReport(){
+  var c = counts();
+  var lines = [];
+  lines.push('# DAY1 检验记录 · 2026-10-21');
+  lines.push('');
+  lines.push('- 学习块：'+c.learn+'/4');
+  lines.push('- A 组：'+c.score+'/15（已作答 '+c.answered+'/15）');
+  lines.push('- B 组提交：'+c.bDone+'/5');
+  lines.push('- C 组上板：'+c.cDone+'/6');
+  lines.push('');
+  if(c.answered < 15){
+    var miss = [];
+    S.a.forEach(function(v,i){ if(v===0) miss.push('Q'+(i+1)); });
+    lines.push('未作答：'+miss.join('、'));
+    lines.push('');
+  }
+  var stuck = [];
+  S.a.forEach(function(v,i){ if(v===2) stuck.push('Q'+(i+1)); });
+  lines.push('## 卡住的题');
+  lines.push(stuck.length ? stuck.join('、') : '（无）');
+  lines.push('');
+  lines.push('## B 组预测');
+  EXPS.forEach(function(item,i){
+    lines.push('### '+item.t.replace(/`/g,''));
+    lines.push(S.b[i].trim() || '（没写）');
+    lines.push('');
+  });
+  lines.push('## C 组实测');
+  BOARD.forEach(function(item,i){
+    lines.push('- '+item.id+' '+(S.c[i]?'✅':'⬜')+' '+(S.cNote[i].trim()||'（无记录）'));
+  });
+  lines.push('');
+  lines.push('## 今天没搞懂的');
+  S.q.forEach(function(v,i){ if(v.trim()) lines.push((i+1)+'. '+v.trim()); });
+  return lines.join('\n');
+}
+
+function copyReport(){
+  var text = buildReport();
+  function fallback(){
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed'; ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try{ document.execCommand('copy'); toast('已复制'); }
+    catch(e){ toast('复制失败，请手动选中控制台输出'); console.log(text); }
+    document.body.removeChild(ta);
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ toast('已复制'); }, fallback);
+  } else {
+    fallback();
+  }
+}
+
+/* ---------- 事件 ---------- */
+
+function bind(){
+  document.getElementById('quiz').addEventListener('click', function(e){
+    var t = e.target;
+    if(t.tagName !== 'BUTTON') return;
+    var i = +t.dataset.i;
+    if(t.classList.contains('pick')){ pickA(i, +t.dataset.v); }
+    else if(t.classList.contains('toggle')){ toggleAns(i); }
+  });
+
+  document.getElementById('gType').addEventListener('change', renderGen);
+  document.getElementById('gGo').addEventListener('click', doGen);
+  document.getElementById('gHome').addEventListener('click', function(){
+    document.getElementById('gx').value = -59;
+    document.getElementById('gy').value = 143;
+    document.getElementById('gz').value = 32;
+    document.getElementById('gp').value = 45;
+    doGen();
+  });
+  document.getElementById('pGo').addEventListener('click', doParse);
+  document.getElementById('pDemo').addEventListener('click', function(){
+    document.getElementById('pIn').value = 'AA 0C 81 65 04 C2 01 7C FC 84 03 62';
+    doParse();
+  });
+
+  var tabs = document.querySelectorAll('.tabs button');
+  for(var i=0;i<tabs.length;i++){
+    tabs[i].addEventListener('click', function(e){
+      var name = e.target.dataset.pane;
+      var all = document.querySelectorAll('.tabs button');
+      for(var k=0;k<all.length;k++) all[k].classList.toggle('on', all[k]===e.target);
+      document.getElementById('pane-gen').classList.toggle('on', name==='gen');
+      document.getElementById('pane-parse').classList.toggle('on', name==='parse');
+    });
+  }
+
+  for(var q=0;q<3;q++){
+    (function(idx){
+      var ta = document.getElementById('q'+idx);
+      ta.value = S.q[idx];
+      ta.addEventListener('input', function(){ S.q[idx] = ta.value; save(); });
+    })(q);
+  }
+
+  document.getElementById('copyBtn').addEventListener('click', copyReport);
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    if(!confirm('清空所有勾选、自评和记录？')) return;
+    try{ localStorage.removeItem(KEY); }catch(e){}
+    location.reload();
+  });
+}
+
+/* ---------- 启动 ---------- */
+
+load();
+renderLearn();
+renderQuiz();
+renderExps();
+renderBoard();
+bind();
+for(var i=0;i<15;i++) paintA(i);
+updateStats();
+renderGen();
+doGen();
+
+/* 暴露给控制台调试 */
+window.__day1 = {S:S, buildFrame:buildFrame, frameFor:frameFor, parseStream:parseStream, parseHex:parseHex, hexs:hexs, buildReport:buildReport};
+})();
+</script>
+</body>
+</html>

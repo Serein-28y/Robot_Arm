@@ -1,0 +1,35 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "flash: ST-LINK",
+      "type": "shell",
+      "command": "openocd",
+      "args": [
+        "-f", "interface/stlink-dap.cfg",
+        "-c", "transport select dapdirect_swd",
+        "-f", "target/stm32f1x.cfg",
+        "-c", "adapter speed 4000",
+        "-c", "program build/Debug/Test3.elf verify reset exit"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "flash: DAPLink",
+      "type": "shell",
+      "command": "openocd",
+      "args": [
+        "-f", "interface/cmsis-dap.cfg",
+        "-c", "transport select swd",
+        "-f", "target/stm32f1x.cfg",
+        "-c", "adapter speed 4000",
+        "-c", "program build/Debug/Test3.elf verify reset exit"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    }
+  ]
+}
