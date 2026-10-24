@@ -236,7 +236,7 @@ uint8_t IK_Solve(const Pose *t, const float cur[J_NUM], float out[J_NUM])
     {
         return 0;
     }
-
+    //将最佳解复制到输出数组
     for (j = 0; j < J_NUM; j++)
     {
         out[j] = best[j];

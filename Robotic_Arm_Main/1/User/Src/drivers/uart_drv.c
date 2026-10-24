@@ -49,7 +49,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
     {
         return;
     }
-
+    //将数据写入缓冲区
     if (Size > 0)
     {
         RingBuf_Write(s_rx_buf, (uint8_t)Size);

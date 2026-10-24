@@ -187,10 +187,11 @@ uint8_t Cmd_Submit(const Command *c)
  *   STOP      -> Motion_Stop
  *   QUERY     -> 返回当前角度
  */
+ 
 uint8_t Cmd_Task(CmdResult *r)
 {
     Command c;
-    float cur[J_NUM];
+    float cur[J_NUM];//声明的垃圾值(临时变量)
     float out[J_NUM];
 
     if (r == 0)
@@ -202,22 +203,23 @@ uint8_t Cmd_Task(CmdResult *r)
     {
         return 0;
     }
-
+    //取命令随后队头往前挪，不再回头读取该命令
     queue_pop(&c);
 
-    Motion_GetCurrent(cur);
-    copy_joints(out, cur);
-
+    Motion_GetCurrent(cur);//将当前角复制给cur
+    copy_joints(out, cur);//将cur拷贝给out
+    //先假设成功
     r->valid = 1;
     r->err   = CMD_ERR_NONE;
-
+    
     switch (c.type)
     {
         case CMD_SET_POSE:
         {
-            Pose target;
+            Pose target;//位姿
             float solved[J_NUM];
 
+            //解析目标位姿
             target.x   = c.arg[0];
             target.y   = c.arg[1];
             target.z   = c.arg[2];
@@ -229,13 +231,13 @@ uint8_t Cmd_Task(CmdResult *r)
                 r->err = CMD_ERR_WS;
                 break;
             }
-
+            //求解逆运动学
             if (!IK_Solve(&target, cur, solved))
             {
                 r->err = CMD_ERR_WS;
                 break;
             }
-
+            //设置四个参数，从哪走，走到哪，走几步，走多久
             Motion_MoveTo(solved, calc_duration(cur, solved));
             copy_joints(out, solved);
             s_pose = target;

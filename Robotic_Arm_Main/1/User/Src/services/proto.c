@@ -93,15 +93,15 @@ void Proto_Poll(uint32_t now_ms)
             RingBuf_Skip(1);
             continue;
         }
-
+        //找到包头就看下一个，指向下一个
         len = RingBuf_Peek(1);
-
+        //是否合法
         if (len < 4 || len > PROTO_MAX_LEN)
         {
             RingBuf_Skip(1);
             continue;
         }
-
+        //只传了一部分帧，直接退，等有一帧再接收
         if (RingBuf_GetLength() < len)
         {
             break;   /* 半帧，等更多数据 */
@@ -112,16 +112,16 @@ void Proto_Poll(uint32_t now_ms)
         {
             frame[i] = RingBuf_Peek(i);
         }
-
+        //计算校验和
         if (frame_sum(frame, len) != frame[len - 1])
         {
             send_error(CMD_ERR_CHECKSUM);
             RingBuf_Skip(1);   /* 文档约定：校验失败丢 1 字节重找 */
             continue;
         }
-
+        //校验正确后，获取命令码
         cmd = frame[2];
-
+        //确定传来的是那种命令
         if (cmd == 0x01)   /* MOVE: x,y,z,phi(int16 LE, phi 0.1°) */
         {
             if (len != 12)
@@ -130,7 +130,7 @@ void Proto_Poll(uint32_t now_ms)
                 RingBuf_Skip(len);
                 continue;
             }
-
+            //命令码正确后，开始存解析并存入姿态数据
             command.type = CMD_SET_POSE;
             command.n    = 4;
             command.arg[0] = (float)read_le16(frame[3], frame[4]);

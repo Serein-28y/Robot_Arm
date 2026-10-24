@@ -44,8 +44,8 @@
 #include "services/proto.h"
 #include "app/ui.h"
 
-#define APP_MODE_MENU (0)
-#define APP_MODE_HOST (1)
+#define APP_MODE_MENU (0)//菜单模式
+#define APP_MODE_HOST (1)//主机模式
 
 static uint8_t  s_mode;              /* 当前顶层模式 */
 static uint8_t  s_key2_ignore_hold;  /* 刚进入 HOST 时屏蔽 KEY2 长按，等松开 */
@@ -157,7 +157,7 @@ static void button_task(uint32_t now_ms)
 
     /* KEY1 当前只有一个模式，只扫描状态，不做动作。 */
     (void)Button_Scan(KEY_ID_1, now_ms);
-
+    //按键扫描，判断key2是否按下以及是点按还是长按
     event = Button_Scan(KEY_ID_2, now_ms);
 
     if (event == BTN_PRESS && s_mode == APP_MODE_MENU)
@@ -170,20 +170,21 @@ static void button_task(uint32_t now_ms)
     {
         s_key2_ignore_hold = 0;
     }
-
+   
     if (s_mode == APP_MODE_HOST &&
         !s_key2_ignore_hold &&
         Button_Held(KEY_ID_2, now_ms, BUTTON_HOLD_MS))
     {
         exit_host();
     }
-
+    
+    //检测KEY3按下，执行复位
     event = Button_Scan(KEY_ID_3, now_ms);
     if (event == BTN_PRESS)
     {
         do_home();
     }
-
+    //检测KEY4按下，执行急停
     event = Button_Scan(KEY_ID_4, now_ms);
     if (event == BTN_PRESS)
     {
@@ -249,20 +250,20 @@ void App_Init(void)
     Joint_Init();//根据设置的初始脉冲计算出相对应的初始角度，同时给Motion_GetCurrent()提供初始角度
     Motion_Init();//读取Joint_GetHome()的角度初始化当前角度、起始角度、目标角度，并将busy标志清零
     Servo_Init();//输出初始的脉冲到舵机，启动PWM
-    Uart_Init();
-    Sched_Init();
-    Button_Init(Sched_Now());
-    Cmd_Init();
-    UI_Init();
+    Uart_Init();//开启串口中断接收以及中断后进去回调函数
+    Sched_Init();//规定好初始的tick时间
+    Button_Init(Sched_Now());//按键初始化，读取四路按键的初始电平并建立状态
+    Cmd_Init();//读取关节角算初始末位姿态
+    UI_Init();//OLED初始化，清空状态并绘制菜单页
 
     s_mode             = APP_MODE_MENU;
     s_key2_ignore_hold = 0;
     s_timeout_latched  = 0;
     s_estop            = 0;
 
-    now_ms = Sched_Now();
-    s_last_activity = now_ms;
-    s_prev_rx_tick  = Proto_GetLastValidTick();
+    now_ms = Sched_Now();//获取当前tick时间
+    s_last_activity = now_ms;//记录最近活动时刻：有效帧或运动中
+    s_prev_rx_tick  = Proto_GetLastValidTick();//获取上一次有效帧 tick，用于检测新帧
 }
 
 /**
@@ -280,7 +281,7 @@ void App_Run(void)
     {
         /* HOST：解析串口帧 -> 执行一条命令 -> 立即回 ACK/ERR。 */
         Proto_Poll(now_ms);
-
+        //接收指令，进入某个模式，解算运动，设置舵机线性插值运动
         if (Cmd_Task(&result))
         {
             if (result.err == CMD_ERR_NONE)
@@ -300,23 +301,28 @@ void App_Run(void)
         RingBuf_Skip(RingBuf_GetLength());
         Cmd_Clear();
     }
+    //轮询是都到了10/20/50ms，到了就执行对应的任务
 
+    //按键轮询
     if (Sched_IsDue(SCHED_BUTTON, BUTTON_SCAN_MS))
     {
         button_task(Sched_Now());
     }
 
+    //运动轮询(底层驱动层)
     if (Sched_IsDue(SCHED_MOTION, MOTION_STEP_MS))
     {
         Motion_Task();
         apply_servo();
     }
 
+    //看门狗轮询
     if (Sched_IsDue(SCHED_WDG, WDG_PERIOD_MS))
     {
         watchdog_task(Sched_Now());
     }
 
+    //UI轮询（OLED等）
     if (Sched_IsDue(SCHED_UI, UI_PERIOD_MS))
     {
         update_ui();
